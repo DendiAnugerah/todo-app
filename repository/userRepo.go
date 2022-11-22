@@ -19,9 +19,9 @@ func (u *UserRepository) AddUser(user model.User) error {
 
 func (u *UserRepository) CheckPasswordLength(pass string) bool {
 	if len(pass) <= 5 {
-		return false
+		return true
 	}
-	return true
+	return false
 }
 
 func (u *UserRepository) IsUsernameAvail(user model.User) error {
