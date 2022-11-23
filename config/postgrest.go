@@ -10,7 +10,9 @@ import (
 	"gorm.io/gorm"
 )
 
-func DB() *gorm.DB {
+type Config struct{}
+
+func (c *Config) DB() *gorm.DB {
 	Env := godotenv.Load()
 
 	if Env != nil {
@@ -31,4 +33,8 @@ func DB() *gorm.DB {
 	}
 
 	return db
+}
+
+func NewDB() *Config {
+	return &Config{}
 }
