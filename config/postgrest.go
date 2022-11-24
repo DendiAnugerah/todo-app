@@ -12,7 +12,7 @@ import (
 
 type Config struct{}
 
-func (c *Config) DB() *gorm.DB {
+func (c *Config) Connection() *gorm.DB {
 	Env := godotenv.Load()
 
 	if Env != nil {
@@ -24,7 +24,7 @@ func (c *Config) DB() *gorm.DB {
 	dbPass := os.Getenv("DB_PASS")
 	dbName := os.Getenv("DB_NAME")
 
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port 5432 sslmode=disable TimeZone=Asia/Shanghai",
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=5432 sslmode=disable TimeZone=Asia/Shanghai",
 		dbHost, dbUser, dbPass, dbName)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
