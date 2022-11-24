@@ -2,76 +2,128 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/DendiAnugerah/Todo/model"
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
 )
 
-func (A *API) RegisterUser(c echo.Context) error {
-	var user model.User
+func (A *API) Register(w http.ResponseWriter, r *http.Request) {
 
-	err := json.NewDecoder(c.Request().Body).Decode(&user)
+	var user model.User
+	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
-		return c.JSON(400, model.ErrorResponse{Error: err.Error()})
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(model.ErrorResponse{Error: "Internal server error"})
+		return
 	}
 
 	if user.Username == "" || user.Password == "" {
-		return c.JSON(400, model.ErrorResponse{Error: "Username or password cannot be empty!"})
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(model.ErrorResponse{Error: "Username or password cannot empty!"})
 	}
 
 	if A.UserRepo.CheckPasswordLength(user.Password) {
-		return c.JSON(400, model.ErrorResponse{Error: "Password length must be greater than 5!"})
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(model.ErrorResponse{Error: "Please provide a password of more than 5 characters"})
+		return
 	}
 
 	err = A.UserRepo.AddUser(user)
 	if err != nil {
-		return c.JSON(500, model.ErrorResponse{Error: err.Error()})
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(model.ErrorResponse{Error: "Internal Server Error"})
+		return
 	}
 
-	return c.JSON(200, model.SuccessResponse{Username: user.Username, Message: "User registered successfully!"})
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(model.SuccessResponse{Username: user.Username, Message: "User Registered"})
 }
 
-func (A *API) Login(c echo.Context) error {
-	var user model.User
-	err := json.NewDecoder(c.Request().Body).Decode(&user)
+func (A *API) Login(w http.ResponseWriter, r *http.Request) {
+	var creds model.User
+
+	err := json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil {
-		return c.JSON(400, model.ErrorResponse{Error: err.Error()})
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(model.ErrorResponse{Error: "Internal Server Error"})
+		return
 	}
 
-	if user.Username == "" || user.Password == "" {
-		return c.JSON(400, model.ErrorResponse{Error: "Username or password cannot be empty!"})
+	if creds.Username == "" || creds.Password == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(model.ErrorResponse{Error: "Bad Request"})
+		return
 	}
 
-	err = A.UserRepo.IsUsernameAvail(user)
+	if A.UserRepo.CheckPasswordLength(creds.Password) {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(model.ErrorResponse{Error: "Please provide a password of more than 5 characters"})
+		return
+	}
+
+	err = A.UserRepo.IsUsernameAvail(creds)
 	if err != nil {
-		return c.JSON(401, model.ErrorResponse{Error: "Wrong username or password!"})
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(model.ErrorResponse{Error: "Wrong User or Password!"})
+		return
 	}
 
-	sessionToken := uuid.New().String()
-	Expiry := time.Now().Add(time.Hour * 3)
-	session := model.Session{Token: sessionToken, Username: user.Username, Expiry: Expiry}
+	sessionToken := uuid.NewString()
+	expiresAt := time.Now().Add(5 * time.Hour)
+	session := model.Session{Token: sessionToken, Username: creds.Username, Expiry: expiresAt}
 
 	_, err = A.SessionRepo.SessionNameAvail(session.Username)
+
 	if err != nil {
 		err = A.SessionRepo.AddSession(session)
-		if err != nil {
-			return c.JSON(500, model.ErrorResponse{Error: err.Error()})
-		}
 	} else {
 		err = A.SessionRepo.UpdateSession(session)
-		if err != nil {
-			return c.JSON(500, model.ErrorResponse{Error: err.Error()})
-		}
 	}
 
-	c.SetCookie(&http.Cookie{
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(model.ErrorResponse{Error: "Internal Server Error"})
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
 		Name:    "session_token",
+		Path:    "/",
 		Value:   sessionToken,
-		Expires: Expiry,
+		Expires: expiresAt,
 	})
 
-	return c.JSON(200, model.SuccessResponse{Username: user.Username, Message: "Login successfully!"})
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(model.SuccessResponse{Username: creds.Username, Message: "Login Success"})
+}
+
+func (A *API) Logout(w http.ResponseWriter, r *http.Request) {
+	username := fmt.Sprintf("%s", r.Context().Value("username"))
+
+	c, err := r.Cookie("session_token")
+	if err != nil {
+		if err == http.ErrNoCookie {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(model.ErrorResponse{Error: "Internal Server Error"})
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(model.ErrorResponse{Error: "Internal Server Error"})
+		return
+	}
+	sessionToken := c.Value
+
+	A.SessionRepo.DeleteSession(sessionToken)
+
+	http.SetCookie(w, &http.Cookie{
+		Name:    "session_token",
+		Value:   "",
+		Expires: time.Now(),
+	})
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(model.SuccessResponse{Username: username, Message: "Logout Success"})
 }

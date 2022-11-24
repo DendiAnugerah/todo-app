@@ -17,12 +17,16 @@ func NewAPI(todoRepo repository.TodoRepository, userRepo repository.UserReposito
 	api := API{todoRepo, userRepo, sessionRepo}
 	c := echo.New()
 
-	c.POST("/register", api.RegisterUser)
-	c.POST("/login", api.Login)
+	c.POST("/user/register", api.RegisterUser)
+	c.POST("/user/login", api.Login)
+	// c.GET("/user/logout", api.Logout)
 
 	return api
 }
 
+func (A *API) Handler() *echo.Echo {
+	return API
+}
 func (A *API) Start() {
 	e := echo.New()
 
