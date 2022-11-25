@@ -21,7 +21,7 @@ func (s *SessionRepository) AddSession(session model.Session) error {
 }
 
 func (s *SessionRepository) DeleteSession(token string) error {
-	return s.db.Where("token = ", token).Delete(&model.Session{}).Error
+	return s.db.Where("token = ?", token).Delete(&model.Session{}).Error
 }
 
 func (s *SessionRepository) UpdateSession(session model.Session) error {
@@ -30,7 +30,7 @@ func (s *SessionRepository) UpdateSession(session model.Session) error {
 
 func (s *SessionRepository) SessionNameAvail(name string) (model.Session, error) {
 	sessions := model.Session{}
-	err := s.db.Where("username = ", name).First(&sessions).Error
+	err := s.db.Where("username = ?", name).First(&sessions).Error
 	if err != nil {
 		return model.Session{}, err
 	}
@@ -58,7 +58,7 @@ func (s *SessionRepository) IsTokenValid(token string) (model.Session, error) {
 
 func (s *SessionRepository) SessionTokenAvail(token string) (model.Session, error) {
 	sessions := model.Session{}
-	err := s.db.Where("token = ", token).First(&sessions).Error
+	err := s.db.Where("token = ?", token).First(&sessions).Error
 	if err != nil {
 		return model.Session{}, err
 	}
