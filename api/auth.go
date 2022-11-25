@@ -10,16 +10,22 @@ import (
 
 func (A *API) Auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie("session_token")
+		c, err := r.Cookie("session_token")
 		if err != nil {
-			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(model.ErrorResponse{Error: "Unauthorized"})
+			if err == http.ErrNoCookie {
+				w.WriteHeader(http.StatusUnauthorized)
+				json.NewEncoder(w).Encode(model.ErrorResponse{Error: err.Error()})
+				return
+			}
+
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(model.ErrorResponse{Error: err.Error()})
 			return
 		}
 
-		session := cookie.Value
+		session := c.Value
 
-		sessionFound, err := A.SessionRepo.SessionNameAvail(session)
+		sessionFound, err := A.SessionRepo.IsTokenValid(session)
 		if err != nil {
 			w.WriteHeader(http.StatusUnauthorized)
 			json.NewEncoder(w).Encode(model.ErrorResponse{Error: err.Error()})
